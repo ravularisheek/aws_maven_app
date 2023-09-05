@@ -1,0 +1,50 @@
+pipeline {
+    agent{
+        node{
+            label 'awsvm'
+            }
+    }
+
+     options    {
+                timestamps()
+                buildDiscarder(logRotator(numToKeepStr: '2', artifactNumToKeepStr: '2'))
+                timeout(time: 120, unit: 'MINUTES')
+                disableConcurrentBuilds()
+                }
+     parameters {
+            string(name: 'gitURL', defaultValue: 'https://github.com/ravularisheek/aws_maven_app.git', description: "pass the maven repo source code giturl")
+            string(name: 'appBranch', defaultValue: 'master', description: "Application Branch name of the Repo")
+                } 
+
+    stages {
+        stage('check out') {
+            steps {
+                git branch: appBranch, url: gitURL
+            }
+        }
+        stage('maven build') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        stage('docker build') {
+            steps {
+                sh 'docker build . -f dockerbuild_testapp -t ravularisheek/awsmavendemo:latest'
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+
+            withCredentials([usernamePassword(credentialsId: 'dockerlogin', passwordVariable: 'dockerpwd', usernameVariable: 'dockeruser')]) {
+    			sh 'docker login -u ${dockeruser} -p ${dockerpwd}'
+				} 
+            }
+        }   
+        stage('docker push') {
+            steps {
+                sh 'docker push ravularisheek/awsmavendemo:latest'
+            }
+        }
+    }
+}
